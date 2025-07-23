@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - 'web/**'
+      - 'web/**' # only when changes happen to the specified folder and anything inside it (files/folders) will the flow be triggered.
   push:
     branches:
       - main

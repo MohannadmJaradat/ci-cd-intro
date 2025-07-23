@@ -1,5 +1,8 @@
 name: Create Dev Staging Environment
 
+# This workflow is triggered manually via the GitHub UI using the workflow_dispatch event.
+# and it requires a PR number as input.
+# The PR number is used to verify the pull request and create a staging environment for it.
 on:
   workflow_dispatch:
     inputs:
@@ -27,6 +30,14 @@ jobs:
     # which can be fetched in next steps via:
     # ${{ steps.verify_pr_number.outputs.result }}
     # ======================================================
+
+    # The action used here (github-script@v5) allows us to run JavaScript code
+    # by bootstrapping the runner with the nodejs library. Using the mulit-line
+    # segment we can call any github endpoint and do whatever you want on the repo's level.
+    # What we are doing here is basically fetching the pull request number
+    # and checking if it is valid. If it is not, we throw an error.
+    # To know how to structure this mulit-line segment, you can refer to the
+    # GitHub REST API documentation: https://docs.github.com/en/rest/reference/pulls#get
     - name: Verify Pull Request Number
       uses: actions/github-script@v5
       id: verify_pr_number
@@ -51,6 +62,11 @@ jobs:
     # ======================================================
     # Checkout the branch infra and the repository
     # ======================================================
+
+    # For this demo, the application files and the infrastructure files
+    # are in the same repository. The infra branch contains the Terraform. 
+    # This is a bad practice in real-world applications, but for the sake of this demo
+    # we will use the same repository.
     - uses: actions/checkout@v2
       name: 'Checkout repository and infra branch'
       with:
@@ -169,6 +185,9 @@ jobs:
     # to print "Nothing to commit" to the console if 
     # git push fails.
     # ======================================================
+
+    # git push || echo "Nothing to commit" guarantees that if there are no changes to commit,
+    # the workflow will not fail. This is useful in case the resource file already exists.
     - name: Commit terraform resource files to the PR
       working-directory: infra/instances/staging/
       run: |
@@ -194,8 +213,8 @@ jobs:
     - uses: burnett01/rsync-deployments@23a557dceb19f9bb960ef40cf75cab5e9b37ec1f
       name: 'Deploy to staging'
       with:
-        switches: -avzr --delete
-        path: ./web
+        switches: -avzr --delete # The --delete flag ensures that files deleted locally are also deleted on the remote server.
+        path: ./web # rsyncs the web directory in the runner to our staging server
         remote_path: /var/app
         remote_host: ${{ steps.apply_output.outputs.stdout }}
         remote_user: ${{ secrets.REMOTE_USER }}
@@ -205,6 +224,8 @@ jobs:
     # Once we have the new files synced to the staging server
     # we need to restart the staging server.
     # ======================================================
+
+    # We used the below community action in order to ssh into the instance and execute some commands
     - uses: JimCronqvist/action-ssh@7737f1192ddd8376686e9d6354dea44592c942bf
       name: Execute SSH commmands on remote server
       with:
